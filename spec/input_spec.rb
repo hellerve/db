@@ -129,10 +129,10 @@ describe 'database' do
 
       expect(result).to match_array([
         "Tree:",
-        "leaf (size 3)",
-        "  - 0 : 1",
-        "  - 1 : 2",
-        "  - 2 : 3",
+        "- leaf (size 3)",
+        "  - 1",
+        "  - 2",
+        "  - 3",
         "Goodbye!"
       ])
   end
@@ -155,10 +155,10 @@ describe 'database' do
         "LNODE_MAX_CELLS: 13",
         "",
         "Tree:",
-        "leaf (size 3)",
-        "  - 0 : 1",
-        "  - 1 : 2",
-        "  - 2 : 3",
+        "- leaf (size 3)",
+        "  - 1",
+        "  - 2",
+        "  - 3",
         "Goodbye!"
       ])
   end
@@ -175,6 +175,38 @@ describe 'database' do
       "Error: duplicate key!",
       "(1, user1, person1@example.com)",
       "Goodbye!",
+    ])
+  end
+
+  it 'allows printing out the structure of a 3-leaf-node btree' do
+    script = (1..14).map do |i|
+      "insert #{i} user#{i} person#{i}@example.com"
+    end
+    script << ":tree"
+    script << ":q"
+    result = run_script(script)
+
+    expect(result[14...(result.length)]).to match_array([
+      "Tree:",
+      "- internal (size 1)",
+      "  - leaf (size 7)",
+      "    - 1",
+      "    - 2",
+      "    - 3",
+      "    - 4",
+      "    - 5",
+      "    - 6",
+      "    - 7",
+      "- key 7",
+      "  - leaf (size 7)",
+      "    - 8",
+      "    - 9",
+      "    - 10",
+      "    - 11",
+      "    - 12",
+      "    - 13",
+      "    - 14",
+      "Goodbye!"
     ])
   end
 end

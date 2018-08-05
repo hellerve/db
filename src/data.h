@@ -82,3 +82,8 @@ void lnode_insert(cursor*, uint32_t, row*);
 cursor* lnode_find(table*, uint32_t, uint32_t);
 node_type get_node_type(unsigned char*);
 void set_node_type(unsigned char*, node_type);
+
+uint32_t* inode_num_keys(unsigned char*);
+uint32_t* inode_key(unsigned char*, uint32_t);
+uint32_t* inode_child(unsigned char* node, uint32_t child_num);
+uint32_t* inode_right_child(unsigned char* node);

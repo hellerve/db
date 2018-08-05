@@ -11,7 +11,6 @@ void print_row(row* r) {
 exec_result execute_insert(statement* stmt, table* t) {
   unsigned char* node = get_page(t->pager, t->root_page_num);
   uint32_t ncells = *lnode_num_cells(node);
-  if (ncells >= LNODE_MAX_CELLS) return EXEC_TABLE_FULL;
 
   row* row_to_insert = &(stmt->row);
   cursor* c = table_find(t, row_to_insert->id);

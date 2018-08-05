@@ -28,6 +28,30 @@ const uint32_t LNODE_CELL_SIZE = LNODE_KEY_SIZE + LNODE_VALUE_SIZE;
 const uint32_t LNODE_SPACE_FOR_CELLS = PAGE_SIZE - LNODE_HEADER_SIZE;
 const uint32_t LNODE_MAX_CELLS = LNODE_SPACE_FOR_CELLS / LNODE_CELL_SIZE;
 
+const uint32_t LNODE_RIGHT_SPLIT_COUNT = (LNODE_MAX_CELLS+1) / 2;
+const uint32_t LNODE_LEFT_SPLIT_COUNT =
+  (LNODE_MAX_CELLS+1) - LNODE_RIGHT_SPLIT_COUNT;
+
+const uint32_t INODE_NUM_KEYS_SIZE = sizeof(uint32_t);
+const uint32_t INODE_NUM_KEYS_OFFSET = NODE_HDR_SIZE;
+const uint32_t INODE_RIGHT_CHILD_SIZE = sizeof(uint32_t);
+const uint32_t INODE_RIGHT_CHILD_OFFSET =
+  INODE_NUM_KEYS_OFFSET + INODE_NUM_KEYS_SIZE;
+const uint32_t INODE_HDR_SIZE =
+  NODE_HDR_SIZE + INODE_NUM_KEYS_SIZE + INODE_RIGHT_CHILD_SIZE;
+
+const uint32_t INODE_KEY_SIZE = sizeof(uint32_t);
+const uint32_t INODE_CHILD_SIZE = sizeof(uint32_t);
+const uint32_t INODE_CELL_SIZE = INODE_CHILD_SIZE + INODE_KEY_SIZE;
+
+unsigned char is_node_root(unsigned char* node) {
+  return *(node + IS_ROOT_OFFSET);
+}
+
+void set_node_root(unsigned char* node, unsigned char is_root) {
+  *(node + IS_ROOT_OFFSET) = is_root;
+}
+
 unsigned char* get_page(pager* p, uint32_t page_num) {
   if (page_num >= TABLE_MAX_PAGES) {
     printf("Tried to fetch page number out of bounds: %u > %d.\n", page_num,
@@ -57,6 +81,10 @@ unsigned char* get_page(pager* p, uint32_t page_num) {
     }
   }
   return p->pages[page_num];
+}
+
+uint32_t get_unused_page_num(pager* p) {
+  return p->npages;
 }
 
 unsigned char* cursor_value(cursor* c) {
@@ -103,13 +131,18 @@ pager* pager_open(const char* filename) {
 }
 
 table* db_open(const char* filename) {
+  unsigned char* root;
   pager* p = pager_open(filename);
 
   table* res = malloc(sizeof(table));
   res->pager = p;
   res->root_page_num = 0;
 
-  if (!p->npages) initialize_lnode(get_page(p, 0));
+  if (!p->npages) {
+    root = get_page(p, 0);
+    initialize_lnode(root);
+    set_node_root(root, 1);
+  }
 
   return res;
 }
@@ -180,6 +213,40 @@ cursor* table_find(table* t, uint32_t key) {
   }
 }
 
+uint32_t* inode_num_keys(unsigned char* node) {
+  return (uint32_t*) (node + INODE_NUM_KEYS_OFFSET);
+}
+
+void initialize_inode(unsigned char* node) {
+  set_node_type(node, INTERNAL);
+  set_node_root(node, 0);
+  *inode_num_keys(node) = 0;
+}
+
+uint32_t* inode_right_child(unsigned char* node) {
+  return (uint32_t*)(node + INODE_RIGHT_CHILD_OFFSET);
+}
+
+uint32_t* inode_cell(unsigned char* node, uint32_t cell_num) {
+  return (uint32_t*)(node + INODE_HDR_SIZE + cell_num * INODE_CELL_SIZE);
+}
+
+uint32_t* inode_child(unsigned char* node, uint32_t child_num) {
+  uint32_t num_keys = *inode_num_keys(node);
+  if (child_num > num_keys) {
+    printf("Tried to access child_num %d > num_keys %d\n", child_num, num_keys);
+    exit(1);
+  } else if (child_num == num_keys) {
+    return inode_right_child(node);
+  } else {
+    return inode_cell(node, child_num);
+  }
+}
+
+uint32_t* inode_key(unsigned char* node, uint32_t key_num) {
+  return inode_cell(node, key_num) + INODE_CHILD_SIZE;
+}
+
 uint32_t* lnode_num_cells(unsigned char* node) {
   return (uint32_t*) (node + LNODE_NUM_CELLS_OFFSET);
 }
@@ -199,6 +266,65 @@ unsigned char* lnode_value(unsigned char* node, uint32_t cell_num) {
 void initialize_lnode(unsigned char* node) {
   *lnode_num_cells(node) = 0;
   set_node_type(node, LEAF);
+  set_node_root(node, 0);
+}
+
+uint32_t get_node_max_key(unsigned char* node) {
+  switch (get_node_type(node)) {
+    case INTERNAL:
+      return *inode_key(node, *inode_num_keys(node) - 1);
+    case LEAF:
+      return *lnode_key(node, *lnode_num_cells(node) - 1);
+  }
+}
+
+
+void create_new_root(table* t, uint32_t right_pn) {
+  unsigned char* root = get_page(t->pager, t->root_page_num);
+  //unsigned char* right_child = get_page(t->pager, right_pn);
+  uint32_t left_pn = get_unused_page_num(t->pager);
+  unsigned char* left_child = get_page(t->pager, left_pn);
+
+  memcpy(left_child, root, PAGE_SIZE);
+  set_node_root(left_child, 0);
+
+  initialize_inode(root);
+  set_node_root(root, 1);
+  *inode_num_keys(root) = 1;
+  *inode_child(root, 0) = left_pn;
+  uint32_t left_child_max_key = get_node_max_key(left_child);
+  *inode_key(root, 0) = left_child_max_key;
+  *inode_right_child(root) = right_pn;
+}
+
+void lnode_split_and_insert(cursor* c, uint32_t key, row* value) {
+  unsigned char* old_node = get_page(c->table->pager, c->pagen);
+  uint32_t new_page_num = get_unused_page_num(c->table->pager);
+  unsigned char* new_node = get_page(c->table->pager, new_page_num);
+  initialize_lnode(new_node);
+
+  for (int32_t i = LNODE_MAX_CELLS; i >= 0; i--) {
+    unsigned char* dest_node;
+    dest_node = i >= LNODE_LEFT_SPLIT_COUNT ? new_node : old_node;
+    uint32_t index_within_node = i % LNODE_LEFT_SPLIT_COUNT;
+    unsigned char* dest = lnode_cell(dest_node, index_within_node);
+
+    if (i == c->celln) {
+      serialize_row(value, dest);
+    } else if (i > c->celln) {
+      memcpy(dest, lnode_cell(old_node, i - 1), LNODE_CELL_SIZE);
+    } else {
+      memcpy(dest, lnode_cell(old_node, i), LNODE_CELL_SIZE);
+    }
+  }
+  *(lnode_num_cells(old_node)) = LNODE_LEFT_SPLIT_COUNT;
+  *(lnode_num_cells(new_node)) = LNODE_RIGHT_SPLIT_COUNT;
+
+  if (is_node_root(old_node)) {
+    create_new_root(c->table, new_page_num);
+  } else {
+    exit(1);
+  }
 }
 
 void lnode_insert(cursor* c, uint32_t key, row* value) {
@@ -207,7 +333,8 @@ void lnode_insert(cursor* c, uint32_t key, row* value) {
   uint32_t ncells = *lnode_num_cells(pg);
 
   if (ncells >= LNODE_MAX_CELLS) {
-    exit(1);
+    lnode_split_and_insert(c, key, value);
+    return;
   }
 
   if (c->celln < ncells) {
