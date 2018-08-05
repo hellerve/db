@@ -10,10 +10,15 @@ void print_row(row* r) {
 
 exec_result execute_insert(statement* stmt, table* t) {
   unsigned char* node = get_page(t->pager, t->root_page_num);
-  if ((*lnode_num_cells(node)) >= LNODE_MAX_CELLS) return EXEC_TABLE_FULL;
+  uint32_t ncells = *lnode_num_cells(node);
+  if (ncells >= LNODE_MAX_CELLS) return EXEC_TABLE_FULL;
 
   row* row_to_insert = &(stmt->row);
-  cursor* c = table_end(t);
+  cursor* c = table_find(t, row_to_insert->id);
+
+  if (c->celln < ncells && row_to_insert->id == *lnode_key(node, c->celln)) {
+    return EXEC_DUPLICATE_KEY;
+  }
 
   lnode_insert(c, row_to_insert->id, row_to_insert);
 

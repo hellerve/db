@@ -49,7 +49,7 @@ unsigned char* cursor_value(cursor*);
 table* db_open(const char*);
 void db_close(table*);
 cursor* table_start(table*);
-cursor* table_end(table*);
+cursor* table_find(table*, uint32_t);
 void cursor_advance(cursor*);
 unsigned char* get_page(pager*, uint32_t);
 
@@ -79,3 +79,6 @@ uint32_t* lnode_key(unsigned char*, uint32_t);
 unsigned char* lnode_value(unsigned char*, uint32_t);
 void initialize_lnode(unsigned char*);
 void lnode_insert(cursor*, uint32_t, row*);
+cursor* lnode_find(table*, uint32_t, uint32_t);
+node_type get_node_type(unsigned char*);
+void set_node_type(unsigned char*, node_type);

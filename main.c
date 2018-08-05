@@ -49,6 +49,9 @@ int main(int argc, char* argv[]) {
             case EXEC_TABLE_FULL:
               puts("Error: table full!");
               break;
+            case EXEC_DUPLICATE_KEY:
+              puts("Error: duplicate key!");
+              break;
             case EXEC_SUCCESS:
               break;
           }

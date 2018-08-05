@@ -169,15 +169,15 @@ cursor* table_start(table* t) {
   return c;
 }
 
-cursor* table_end(table* t) {
-  cursor* c = malloc(sizeof(cursor));
-  c->table = t;
-  c->pagen = t->root_page_num;
+cursor* table_find(table* t, uint32_t key) {
+  uint32_t root_page_num = t->root_page_num;
+  unsigned char* root = get_page(t->pager, root_page_num);
 
-  c->celln = *lnode_num_cells(get_page(t->pager, t->root_page_num));
-  c->end_of_table = 1;
-
-  return c;
+  if (get_node_type(root) == LEAF) {
+    return lnode_find(t, root_page_num, key);
+  } else {
+    exit(1);
+  }
 }
 
 uint32_t* lnode_num_cells(unsigned char* node) {
@@ -198,6 +198,7 @@ unsigned char* lnode_value(unsigned char* node, uint32_t cell_num) {
 
 void initialize_lnode(unsigned char* node) {
   *lnode_num_cells(node) = 0;
+  set_node_type(node, LEAF);
 }
 
 void lnode_insert(cursor* c, uint32_t key, row* value) {
@@ -220,3 +221,39 @@ void lnode_insert(cursor* c, uint32_t key, row* value) {
   serialize_row(value, lnode_value(pg, c->celln));
 }
 
+cursor* lnode_find(table* t, uint32_t page_num, uint32_t key) {
+  unsigned char* node = get_page(t->pager, page_num);
+  uint32_t ncells = *lnode_num_cells(node);
+
+  cursor* c = malloc(sizeof(cursor));
+  c->table = t;
+  c->pagen = page_num;
+
+  uint32_t min_index = 0;
+  uint32_t one_past_max_index = ncells;
+  while (one_past_max_index != min_index) {
+    uint32_t index = (min_index + one_past_max_index) / 2;
+    uint32_t key_at_index = *lnode_key(node, index);
+    if (key == key_at_index) {
+      c->celln = index;
+      return c;
+    }
+    if (key < key_at_index) {
+      one_past_max_index = index;
+    } else {
+      min_index = index + 1;
+    }
+  }
+
+  c->celln = min_index;
+  return c;
+}
+
+node_type get_node_type(unsigned char* node) {
+  unsigned char value = *(node + NODE_T_OFFSET);
+  return (node_type)value;
+}
+
+void set_node_type(unsigned char* node, node_type type) {
+  *(node+NODE_T_OFFSET) = (unsigned char)type;
+}

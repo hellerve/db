@@ -130,9 +130,9 @@ describe 'database' do
       expect(result).to match_array([
         "Tree:",
         "leaf (size 3)",
-        "  - 0 : 3",
-        "  - 1 : 1",
-        "  - 2 : 2",
+        "  - 0 : 1",
+        "  - 1 : 2",
+        "  - 2 : 3",
         "Goodbye!"
       ])
   end
@@ -156,10 +156,25 @@ describe 'database' do
         "",
         "Tree:",
         "leaf (size 3)",
-        "  - 0 : 3",
-        "  - 1 : 1",
-        "  - 2 : 2",
+        "  - 0 : 1",
+        "  - 1 : 2",
+        "  - 2 : 3",
         "Goodbye!"
       ])
+  end
+
+  it 'prints an error message if there is a duplicate id' do
+    script = [
+      "insert 1 user1 person1@example.com",
+      "insert 1 user1 person1@example.com",
+      "select",
+      ":q",
+    ]
+    result = run_script(script)
+    expect(result).to match_array([
+      "Error: duplicate key!",
+      "(1, user1, person1@example.com)",
+      "Goodbye!",
+    ])
   end
 end
