@@ -8,7 +8,7 @@ void print_constants() {
   puts("Constants:");
   printf("ROW_SIZE: %ld\n", sizeof(row));
   printf("NODE_HDR_SIZE: %d\n", NODE_HDR_SIZE);
-  printf("LNODE_HEADER_SIZE: %d\n", LNODE_HEADER_SIZE);
+  printf("LNODE_HDR_SIZE: %d\n", LNODE_HDR_SIZE);
   printf("LNODE_CELL_SIZE: %d\n", LNODE_CELL_SIZE);
   printf("LNODE_SPACE_FOR_CELLS: %d\n", LNODE_SPACE_FOR_CELLS);
   printf("LNODE_MAX_CELLS: %d\n", LNODE_MAX_CELLS);
