@@ -87,3 +87,4 @@ uint32_t* inode_num_keys(unsigned char*);
 uint32_t* inode_key(unsigned char*, uint32_t);
 uint32_t* inode_child(unsigned char* node, uint32_t child_num);
 uint32_t* inode_right_child(unsigned char* node);
+cursor* inode_find(table*, uint32_t, uint32_t);

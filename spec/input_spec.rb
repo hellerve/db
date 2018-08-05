@@ -5,7 +5,11 @@ describe 'database' do
     raw_output = nil
     IO.popen(["bin/db", DB_FILE], "r+") do |pipe|
       commands.each do |command|
-        pipe.puts command
+        begin
+          pipe.puts command
+        rescue Errno::EPIPIE
+          break
+        end
       end
 
       pipe.close_write
@@ -185,6 +189,7 @@ describe 'database' do
     script << ":tree"
     script << ":q"
     result = run_script(script)
+    print(result)
 
     expect(result[14...(result.length)]).to match_array([
       "Tree:",

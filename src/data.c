@@ -209,7 +209,7 @@ cursor* table_find(table* t, uint32_t key) {
   if (get_node_type(root) == LEAF) {
     return lnode_find(t, root_page_num, key);
   } else {
-    exit(1);
+    return inode_find(t, root_page_num, key);
   }
 }
 
@@ -245,6 +245,33 @@ uint32_t* inode_child(unsigned char* node, uint32_t child_num) {
 
 uint32_t* inode_key(unsigned char* node, uint32_t key_num) {
   return inode_cell(node, key_num) + INODE_CHILD_SIZE;
+}
+
+cursor* inode_find(table* t, uint32_t page_num, uint32_t key) {
+  unsigned char* node = get_page(t->pager, page_num);
+  uint32_t num_keys = *inode_num_keys(node);
+
+  uint32_t min_index = 0;
+  uint32_t max_index = num_keys;
+
+  while (min_index != max_index) {
+    uint32_t index = (min_index + max_index) / 2;
+    uint32_t key_to_right = *inode_key(node, index);
+    if (key_to_right >= key) {
+      max_index = index;
+    } else {
+      min_index = index + 1;
+    }
+  }
+
+  uint32_t child_num = *inode_child(node, min_index);
+  unsigned char* child = get_page(t->pager, child_num);
+  switch (get_node_type(child)) {
+    case LEAF:
+      return lnode_find(t, child_num, key);
+    case INTERNAL:
+      return inode_find(t, child_num, key);
+  }
 }
 
 uint32_t* lnode_num_cells(unsigned char* node) {
